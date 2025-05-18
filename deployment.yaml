@@ -1,19 +1,19 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: chatcord-deployment
+  name: chatapp-deployment
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: chatcord
+      app: chatapp
   template:
     metadata:
       labels:
-        app: chatcord
+        app: chatapp
     spec:
       containers:
-      - name: chatcord
-        image: your-dockerhub-username/chatcord:latest
+      - name: chatapp
+        image: durkeshwaran1103/chatapp:latest
         ports:
         - containerPort: 3000
