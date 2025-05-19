@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: chatapp
-        image: durkeshwaran1103/chatapp:latest
+        image: durkeshwaran1103/chatcord-app:latest  
         ports:
         - containerPort: 3000
         imagePullPolicy: Always
