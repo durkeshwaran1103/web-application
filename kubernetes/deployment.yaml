@@ -17,3 +17,4 @@ spec:
         image: durkeshwaran1103/chatapp:latest
         ports:
         - containerPort: 3000
+        imagePullPolicy: Always
