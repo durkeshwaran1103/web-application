@@ -1,0 +1,112 @@
+pipeline {
+    agent any
+
+    tools {
+         nodejs 'node18'
+        jdk 'jdk17'
+    }
+
+    environment {
+        SCANNER_HOME = tool 'sonar-scanner'
+    }
+
+    stages {
+        stage("Clean Workspace") {
+            steps {
+                cleanWs()
+            }
+        }
+
+        stage("Git Checkout") {
+            steps {
+                git branch: 'main', url: 'https://github.com/durkeshwaran1103/web-application'
+            }
+        }
+
+        stage("SonarQube Analysis") {
+            steps {
+                withSonarQubeEnv('sonar-server') {
+                    sh '''
+                        $SCANNER_HOME/bin/sonar-scanner \
+                        -Dsonar.projectName=chatcord-app \
+                        -Dsonar.projectKey=chatcord-app
+                    '''
+                }
+            }
+        }
+
+        stage("Quality Gate") {
+            steps {
+                script {
+                    waitForQualityGate abortPipeline: false, credentialsId: 'Sonar-token'
+                }
+            }
+        }
+        stage("Install NPM Dependencies") {
+            steps {
+                sh 'npm ci'
+            }
+        }
+
+        stage("OWASP Dependency Scan") {
+            steps {
+                dependencyCheck additionalArguments: '--scan ./ --disableYarnAudit --disableNodeAudit', odcInstallation: 'DP-Check'
+                dependencyCheckPublisher pattern: '**/dependency-check-report.xml'
+            }
+        }
+
+        stage("Trivy File Scan") {
+            steps {
+                sh 'trivy fs . > trivy-scan.txt || true'
+            }
+        }
+
+        stage("Build Docker Image") {
+            steps {
+                sh 'docker build -t chatcord-app .'
+            }
+        }
+
+        stage("Tag & Push to DockerHub") {
+            steps {
+                script {
+                    withDockerRegistry(credentialsId: 'docker-red') {
+                        sh 'docker tag chatcord-app durkeshwaran1103/chatcord-app:latest'
+                        sh 'docker push durkeshwaran1103/chatcord-app:latest'
+                    }
+                }
+            }
+        }
+
+        stage("Docker Scout Image Scan") {
+            steps {
+                script {
+                    withDockerRegistry(credentialsId: 'docker-red', toolName: 'docker') {
+                        sh 'docker-scout quickview durkeshwaran1103/chatcord-app:latest'
+                        sh 'docker-scout cves durkeshwaran1103/chatcord-app:latest'
+                        sh 'docker-scout recommendations durkeshwaran1103/chatcord-app:latest'
+                    }
+                }
+            }
+        }
+
+        stage("Deploy a Container") {
+            steps {
+                sh '''
+                    docker stop chatcord-app || true
+                    docker rm chatcord-app || true
+                    docker run -d --name chatcord-app -p 3000:3000 durkeshwaran1103/chatcord-app:latest
+                '''
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "Build and deployment successful"
+        }
+        failure {
+            echo "build failed, check logs"
+        }
+    }
+}
